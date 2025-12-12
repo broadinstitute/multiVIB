@@ -2,6 +2,7 @@ multiVIB: A Unified Probabilistic Contrastive Learning Framework for Atlas-Scale
 =======
 
 multiVIB is a unified framework to integrate single-cell multi-omics datasets across different scenarios.
+![multiVIB](https://github.com/broadinstitute/multiVIB/blob/main/doc/figure/Figure1_framework.png?raw=false)
 
 Introduction
 -----------------------
@@ -17,7 +18,7 @@ Scales to atlas-level datasets across species and modalities
 Provides a principled and extensible foundation for building next-generation brain cell atlases
 
 Applied to datasets from the BRAIN Initiative, multiVIB demonstrates robust, scalable integration, including cross-modality and cross-species settings while preserving species-specific features.
-![multiVIB](https://github.com/broadinstitute/multiVIB/blob/main/doc/figure/Figure1_framework.png?raw=false)
+![multiVIB](https://github.com/broadinstitute/multiVIB/blob/main/doc/figure/Figure1_scenarios.png?raw=false)
 
 
 Navigating this Repository
@@ -27,7 +28,7 @@ The multiVIB repository is organized as follows:
 ```
 <repo_root>/
 ├─ multiVIB/              # multiVIB python package
-└─ docs/                  # Package documentation
+└─ doc/                   # Package documentation
     └─ source/
         └─ notebooks/     # Example jupyter notebooks
 ```
