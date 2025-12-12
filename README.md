@@ -44,13 +44,13 @@ Tutorial
 We provide end-to-end Jupyter notebooks demonstrating how to use **multiVIB** across common integration tasks.
 
 ### **Available Tutorials**
-- **[01_Figure2.ipynb](tutorials/01_Figur2.ipynb)**  
+- **[01_Figure2.ipynb](doc/tutorial/01_Figur2.ipynb)**  
   Apply multiVIB to the conceptual experiment we set up in Figure 2 of our manuscript.
 
-- **[02_multimodal_integration.ipynb](tutorials/02_multimodal_integration.ipynb)**  
+- **[02_multimodal_integration.ipynb](doc/tutorial/02_multimodal_integration.ipynb)**  
   Integration of multi-omics datasets (e.g., RNA + ATAC).
 
-- **[03_cross_species_integration.ipynb](tutorials/03_cross_species_integration.ipynb)**  
+- **[03_cross_species_integration.ipynb](doc/tutorial/03_cross_species_integration.ipynb)**  
   Cross-species integration of mammalian basal ganlia datasets demonstrating preservation of species-specific variation.
 
 
