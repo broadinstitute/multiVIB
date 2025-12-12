@@ -17,7 +17,7 @@ Scales to atlas-level datasets across species and modalities
 Provides a principled and extensible foundation for building next-generation brain cell atlases
 
 Applied to datasets from the BRAIN Initiative, multiVIB demonstrates robust, scalable integration, including cross-modality and cross-species settings while preserving species-specific features.
-![Fig.1a-b](https://github.com/broadinstitute/multiVIB/blob/main/docs/figure/Figure1_framework.png?raw=false)
+![multiVIB](https://github.com/broadinstitute/multiVIB/blob/main/doc/figure/Figure1_framework.png?raw=false)
 
 
 Navigating this Repository
