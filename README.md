@@ -59,13 +59,4 @@ Preprint and Citation
 
 If you use multiVIB in your research, please cite our preprint:
 
-Yang Xu, Stephen Jordan Fleming, Brice Wang, Erin G Schoenbeck, Mehrtash Babadi, Bing-Xing Huo. multiVIB: A Unified Probabilistic Contrastive Learning Framework for Atlas-Scale Integration of Single-Cell Multi-Omics Data.
-
-@article{xu2025multivib,
-  title={multiVIB: A unified probabilistic contrastive learning framework for atlas-scale integration of single-cell multi-omics data},
-  author={Xu, Yang and Fleming, Stephen Jordan and Wang, Brice and Schoenbeck, Erin G and Babadi, Mehrtash and Huo, Bing-Xing},
-  journal={bioRxiv},
-  pages={2025--11},
-  year={2025},
-  publisher={Cold Spring Harbor Laboratory}
-}
+Yang Xu, Stephen Jordan Fleming, Brice Wang, Erin G Schoenbeck, Mehrtash Babadi, Bing-Xing Huo. multiVIB: A Unified Probabilistic Contrastive Learning Framework for Atlas-Scale Integration of Single-Cell Multi-Omics Data. [bioRxiv](https://www.biorxiv.org/content/10.1101/2025.11.29.691308v1.full), 2025.
