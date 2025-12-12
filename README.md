@@ -1,52 +1,32 @@
-CellCap
+multiVIB: A Unified Probabilistic Contrastive Learning Framework for Atlas-Scale Integration of Single-Cell Multi-Omics Data
 =======
 
-CellCap is a generative model of scRNA-seq perturbation data which emphasizes interpretability. CellCap explicitly models the correspondence between each cell's basal state and the measured perturbation response, and learns how to explain cellular response in terms of weighted sums of a succinct set of response programs. A detailed <a href="https://cellcap.readthedocs.io/en/latest/">documentation</a> is also available.
+multiVIB .
 
-Key concepts of CellCap
+Introduction
 -----------------------
-To understand the correspondence between basal cell state and perturbation response, the CellCap model was built with several interpretable components:
+Comprehensive brain cell atlases are essential for understanding neural functions and enabling translational insights. As single-cell technologies proliferate across experimental platforms, species, and modalities, these atlases must scale accordingly, calling for integration frameworks capable of aligning heterogeneous datasets without erasing biologically meaningful variations.
 
+Existing tools typically focus on narrow integration scenarios, forcing researchers to assemble ad hoc workflows that often introduce artifacts.
+multiVIB addresses this limitation by providing a unified probabilistic contrastive learning framework that supports diverse single-cell integration tasks.
+
+multiVIB:
+Achieves state-of-the-art performance across multiple integration benchmarks
+Mitigates spurious alignments by preserving biologically meaningful heterogeneity
+Scales to atlas-level datasets across species and modalities
+Provides a principled and extensible foundation for building next-generation brain cell atlases
+
+Applied to datasets from the BRAIN Initiative, multiVIB demonstrates robust, scalable integration, including cross-modality and cross-species settings while preserving species-specific features.
 ![Fig.1a-b](https://github.com/broadinstitute/CellCap/blob/main/docs/source/_static/design/Figure1.jpg?raw=false)
 
-1. Basal state $z_{nk}^\text{(basal)}$: this basal state of each cell $n$ can be understood as the pre-perturbation cell state in latent space $k$, where only intrinsic cellular variations are preserved. This basal state does not contain information about the applied perturbation or other covariate information (e.g. batch, donor, ...).
-
-2. Response programs $w_{qk}$: each response program $q$ has a latent representation $\vec{w}_k$ that explains the transcriptional activation or deactivation of sets of genes in response to a perturbation.
-
-3. Attention mechanism: shown in the blue rectangle in panel (a), a multi-head, scaled dot-product attention mechanism is used to model the correspondence between a basal cell state $z_{nk}^\text{(basal)}$ and perturbation responses $w_{qk}$. CellCap learns a set of key vectors $\kappa_{pqk}$ to capture this correspondence. The attention weights $\beta_{nq}$ represent the relevance of each response program $q$ to each basal cell state $z_{nk}^\text{(basal)}$.
-
-4. Program relevance $H_{pq}$: a weight matrix that captures the relevance of response program $q$ to perturbation condition $p$. Bayesian automatic relevance determination is used by the model to keep this matrix sparse and interpretable.
-
-Downstream analyses with CellCap
---------------------------------
-
-Understanding the correspondence between cellular identity and perturbation response can help answer many biological questions. We list a few suggested questions here which can be answered using the key concepts of CellCap above.
-
-![Fig.1c-f](https://github.com/broadinstitute/CellCap/blob/main/docs/source/_static/design/Figure2.jpg?raw=false)
-
-1. How do perturbations relate to each other?
-
-    General relationships are captured by the learned program relevance matrix $H_{pq}$. Additionally, the per-cell response matrix $h_{nq}$ can be used to understand whether different perturbations cause similar responses in given a cell population.
-
-2. What are the transcriptional response programs that we see in a dataset?
-
-    Each response program $q$ in the learned response program matrix $w_{qk}$ aims to reveal a set of genes that are coherently activated or deactivated in perturbed cells. Translating $w_{qk}$ from latent space to gene expression space is achieved by sending $w_{qk}$ through CellCap's linear decoder.
-
-3. For a given perturbation, which cell states respond strongly via each response program?
-
-    For one perturbation $p$, given a response program $q$ of interest, the basal state $z_{nk}^\text{(basal)}$ can be queried by the learned perturbation key $\kappa_{pqk}$. This is a key question that CellCap addresses: the correspondence between basal cell state and perturbation response.
-
-4. What is the response amplitude of each response program in each basal cell state?
-
-    CellCap infers response amplitude "attention weights" $\beta_{nq}$ for each response program $q$ in each cell $n$ given its learned basal state $z_{nk}^\text{(basal)}$.
 
 Navigating this Repository
 --------------------------
 
-The CellCap repository is organized as follows:
+The multiVIB repository is organized as follows:
 ```
 <repo_root>/
-├─ cellcap/               # CellCap python package
+├─ multiVIB/              # multiVIB python package
 └─ docs/                  # Package documentation
     └─ source/
         └─ notebooks/     # Example jupyter notebooks
@@ -54,21 +34,48 @@ The CellCap repository is organized as follows:
 
 Installation
 ------------
-We suggest creating a new conda environment to run CellCap
+We suggest creating a new conda environment to run multiVIB
 
 ```
-conda create -n cellcap python=3.10
-conda activate cellcap
+conda create -n multiVIB python=3.10
+conda activate multiVIB
 
-git clone https://github.com/broadinstitute/CellCap.git
-cd CellCap
+git clone https://github.com/broadinstitute/multiVIB.git
+cd multiVIB
 
 pip install .
 ```
 
+Tutorial
+------------
+We provide end-to-end Jupyter notebooks demonstrating how to use **multiVIB** across common integration tasks.
+
+### **Available Tutorials**
+- **[01_basic_usage.ipynb](tutorials/01_basic_usage.ipynb)**  
+  Minimal example showing data loading, model training, and latent embedding extraction.
+
+- **[02_multimodal_integration.ipynb](tutorials/02_multimodal_integration.ipynb)**  
+  Integration of multi-omics datasets (e.g., RNA + ATAC).
+
+- **[03_cross_species_integration.ipynb](tutorials/03_cross_species_integration.ipynb)**  
+  Human–mouse integration demonstrating preservation of species-specific variation.
+
+- **[04_atlas_scale_pipeline.ipynb](tutorials/04_atlas_scale_pipeline.ipynb)**  
+  Full pipeline for atlas-scale integration using large BRAIN Initiative datasets.
+
+
 Preprint and Citation
 ---------------------
 
-If you use CellCap in your research, please consider citing our paper:
+If you use multiVIB in your research, please cite our preprint:
 
-Yang Xu, Stephen Fleming, Matthew Tegtmeyer, Steven A. McCarroll, Mehrtash Babadi. Modeling interpretable correspondence between cell state and perturbation response with CellCap. [bioRxiv](https://www.biorxiv.org/content/10.1101/2024.03.14.585078v1), 2024.
+Yang Xu, Stephen Jordan Fleming, Brice Wang, Erin G Schoenbeck, Mehrtash Babadi, Bing-Xing Huo. multiVIB: A Unified Probabilistic Contrastive Learning Framework for Atlas-Scale Integration of Single-Cell Multi-Omics Data.
+
+@article{xu2025multivib,
+  title={multiVIB: A unified probabilistic contrastive learning framework for atlas-scale integration of single-cell multi-omics data},
+  author={Xu, Yang and Fleming, Stephen Jordan and Wang, Brice and Schoenbeck, Erin G and Babadi, Mehrtash and Huo, Bing-Xing},
+  journal={bioRxiv},
+  pages={2025--11},
+  year={2025},
+  publisher={Cold Spring Harbor Laboratory}
+}
