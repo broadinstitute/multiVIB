@@ -10,14 +10,6 @@ Comprehensive brain cell atlases are essential for understanding neural function
 
 Existing tools typically focus on narrow integration scenarios, forcing researchers to assemble ad hoc workflows that often introduce artifacts.
 multiVIB addresses this limitation by providing a unified probabilistic contrastive learning framework that supports diverse single-cell integration tasks.
-
-multiVIB:
-Achieves state-of-the-art performance across multiple integration benchmarks
-Mitigates spurious alignments by preserving biologically meaningful heterogeneity
-Scales to atlas-level datasets across species and modalities
-Provides a principled and extensible foundation for building next-generation brain cell atlases
-
-Applied to datasets from the BRAIN Initiative, multiVIB demonstrates robust, scalable integration, including cross-modality and cross-species settings while preserving species-specific features.
 ![multiVIB](https://github.com/broadinstitute/multiVIB/blob/main/doc/figure/Figure1_scenarios.png?raw=false)
 
 
@@ -52,17 +44,14 @@ Tutorial
 We provide end-to-end Jupyter notebooks demonstrating how to use **multiVIB** across common integration tasks.
 
 ### **Available Tutorials**
-- **[01_basic_usage.ipynb](tutorials/01_basic_usage.ipynb)**  
-  Minimal example showing data loading, model training, and latent embedding extraction.
+- **[01_Figure2.ipynb](tutorials/01_Figur2.ipynb)**  
+  Apply multiVIB to the conceptual experiment we set up in Figure 2 of our manuscript.
 
 - **[02_multimodal_integration.ipynb](tutorials/02_multimodal_integration.ipynb)**  
   Integration of multi-omics datasets (e.g., RNA + ATAC).
 
 - **[03_cross_species_integration.ipynb](tutorials/03_cross_species_integration.ipynb)**  
-  Human–mouse integration demonstrating preservation of species-specific variation.
-
-- **[04_atlas_scale_pipeline.ipynb](tutorials/04_atlas_scale_pipeline.ipynb)**  
-  Full pipeline for atlas-scale integration using large BRAIN Initiative datasets.
+  Cross-species integration of mammalian basal ganlia datasets demonstrating preservation of species-specific variation.
 
 
 Preprint and Citation
