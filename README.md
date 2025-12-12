@@ -21,7 +21,7 @@ The multiVIB repository is organized as follows:
 <repo_root>/
 ├─ multiVIB/              # multiVIB python package
 └─ doc/                   # Package documentation
-    └─ source/
+    └─ tutorial/
         └─ notebooks/     # Example jupyter notebooks
 ```
 
