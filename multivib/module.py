@@ -120,58 +120,6 @@ class VariationalEncoder(torch.nn.Module):
         latent = dist.rsample()
         return dist, latent
     
-class Encoder(torch.nn.Module):
-    def __init__(self, n_input=2000, n_hidden=256, n_latent=10):
-        super(Encoder, self).__init__()
-        self.n_input = n_input
-        self.n_latent = n_latent
-        self.n_hidden = n_hidden
-        self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(n_input, n_hidden),
-            torch.nn.Dropout(p=0.2),
-            torch.nn.BatchNorm1d(n_hidden),
-            torch.nn.LeakyReLU(0.1),
-            torch.nn.Linear(n_hidden, n_hidden),
-            torch.nn.Dropout(p=0.2),
-            torch.nn.BatchNorm1d(n_hidden),
-            torch.nn.LeakyReLU(0.1),
-        )
-        self.z_encoder = torch.nn.Linear(n_hidden, n_latent)
-        
-    def forward(self, x):
-        q = self.encoder(x)
-        latent = self.z_encoder(q)
-        return latent
-    
-class Decoder(torch.nn.Module):
-    def __init__(self, n_output=2000,
-                 n_hidden=128, 
-                 n_latent=10,
-                 var_eps=1e-4):
-        super(Decoder, self).__init__()
-        self.n_output = n_output
-        self.n_latent = n_latent
-        self.var_eps = var_eps
-        self.encoder = torch.nn.Sequential(
-            torch.nn.Linear(n_latent, n_hidden),
-            torch.nn.Dropout(p=0.2),
-            torch.nn.BatchNorm1d(n_hidden),
-            torch.nn.LeakyReLU(0.1),
-            torch.nn.Linear(n_hidden, n_hidden),
-            torch.nn.Dropout(p=0.2),
-            torch.nn.BatchNorm1d(n_hidden),
-            torch.nn.LeakyReLU(0.1),
-        )
-        self.mean_encoder = torch.nn.Linear(n_hidden, n_output)
-        self.var_encoder = torch.nn.Linear(n_hidden, n_output)
-        
-    def forward(self, x):
-        q = self.encoder(x)
-        qm = self.mean_encoder(q)
-        qv = torch.exp(self.var_encoder(q)) + self.var_eps
-        dist = Normal(qm, qv.sqrt())
-        return dist
-
 
 SMALL_NUM = np.log(1e-45)
 
