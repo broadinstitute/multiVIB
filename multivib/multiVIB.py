@@ -65,15 +65,13 @@ class multivib(torch.nn.Module):
     def __init__(self,
                  n_input_a=2000, n_input_b=2000, 
                  n_hidden=256, n_latent=10, 
-                 n_batchA=1, n_batchB=1, 
-                 mask=None, joint=True):
+                 n_batch=1, mask=None, joint=True):
         super(multivib, self).__init__()
         self.n_input_a = n_input_a
         self.n_input_b = n_input_b
         self.n_hidden = n_hidden
         self.n_latent = n_latent
-        self.n_batchA = n_batchA
-        self.n_batchB = n_batchB
+        self.n_batch = n_batch
         self.joint = joint
         
         self.maskedlinear = MaskedLinear(self.n_input_b, self.n_input_a)
@@ -85,23 +83,21 @@ class multivib(torch.nn.Module):
             torch.nn.BatchNorm1d(self.n_input_a)
         )
         
-        self.encoderA = VariationalEncoder(
-            n_input=self.n_input_a, 
+        self.encoder = VariationalEncoder(
+            n_input=self.n_input_a,
             n_hidden=self.n_hidden, 
             n_latent=self.n_latent
         )
         self.transform = torch.nn.Tanh()
-        
-        self.projecterA = torch.nn.Linear(self.n_latent+self.n_batchA, 128)
-        # self.projecterB = torch.nn.Linear(self.n_latent+self.n_batchB, 128)
+        self.projecter = torch.nn.Linear(self.n_latent+self.n_batch, 128)
         
         self.apply(init_weights)
 
     def forward(self, x_a, x_b, batcha, batchb):
         
         x_BtoA = self.translator(x_b)
-        qz_a, z_a = self.encoderA(x_a)
-        qz_b, z_b = self.encoderA(x_BtoA)
+        qz_a, z_a = self.encoder(x_a)
+        qz_b, z_b = self.encoder(x_BtoA)
         
         z_a = self.transform(z_a)
         z_b = self.transform(z_b)
@@ -111,9 +107,8 @@ class multivib(torch.nn.Module):
             p_b = z_b
             
         else:
-            p_a = self.projecterA(torch.cat((z_a, batcha), 1))
-            p_b = self.projecterA(torch.cat((z_b, batchb), 1))
-            # p_b = self.projecterB(torch.cat((z_b, batchb), 1))
+            p_a = self.projecter(torch.cat((z_a, batcha), 1))
+            p_b = self.projecter(torch.cat((z_b, batchb), 1))
             
         return {'z_a': z_a, 'z_b': z_b,
                 'qz_a': qz_a, 'qz_b': qz_b,
@@ -123,27 +118,23 @@ class multivibLoRA(torch.nn.Module):
     def __init__(self,
                  n_input_a=2000, n_input_b=2000, 
                  n_hidden=256, n_latent=10,
-                 n_batchA=1, n_batchB=1, rank=128,
-                 joint=True):
+                 n_batch=1, rank=128, joint=True):
         super(multivibLoRA, self).__init__()
         self.n_input_a = n_input_a
         self.n_input_b = n_input_b
         self.n_hidden = n_hidden
         self.n_latent = n_latent
-        self.n_batchA = n_batchA
-        self.n_batchB = n_batchB
+        self.n_batch = n_batch
         self.rank = rank
         self.joint = joint
         
-        self.encoderA = VariationalEncoder(
+        self.encoder = VariationalEncoder(
             n_input=self.n_input_a, 
             n_hidden=self.n_hidden, 
             n_latent=self.n_latent
         )
         self.transform = torch.nn.Tanh()
-        
-        self.projecterA = torch.nn.Linear(self.n_latent+self.n_batchA, 128)
-        # self.projecterB = torch.nn.Linear(self.n_latent+self.n_batchB, 128)
+        self.projecter = torch.nn.Linear(self.n_latent+self.n_batch, 128)
         
         self.apply(init_weights)
         
@@ -152,8 +143,8 @@ class multivibLoRA(torch.nn.Module):
     def forward(self, x_a, x_b, batcha, batchb):
         
         x_BtoA = self.translator(x_b)
-        qz_b, z_b = self.encoderA(x_BtoA)
-        qz_a, z_a = self.encoderA(x_a)
+        qz_b, z_b = self.encoder(x_BtoA)
+        qz_a, z_a = self.encoder(x_a)
         
         z_a = self.transform(z_a)
         z_b = self.transform(z_b)
@@ -174,7 +165,7 @@ def multivib_training(model,
                       Xa, Xb, Xa_pair, Xb_pair,
                       batcha, batchb, batcha_pair, batchb_pair,
                       epoch=100, batch_size=128, 
-                      temp=0.15, alpha=0.05, gamma=1e-4, beta=1e-5,
+                      temp=0.15, alpha=0.05,
                       random_seed=0, if_lr=True):
     
     if if_lr:
