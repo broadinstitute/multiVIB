@@ -48,7 +48,7 @@ We provide end-to-end Jupyter notebooks demonstrating how to use **multiVIB** ac
   Apply multiVIB to the conceptual experiment we set up in Figure 2 of our manuscript.
 
 - **[02_multimodal_integration.ipynb](doc/tutorial/02_multimodal_integration.ipynb)**  
-  Integration of multi-omics datasets (e.g., RNA + ATAC).
+  Integration of multi-omics mouse cortex datasets (RNA + ATAC).
 
 - **[03_cross_species_integration.ipynb](doc/tutorial/03_cross_species_integration.ipynb)**  
   Cross-species integration of mammalian basal ganlia datasets demonstrating preservation of species-specific variation.
