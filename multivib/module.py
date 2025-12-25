@@ -79,7 +79,7 @@ class LoRALinear(torch.nn.Module):
         
         torch.nn.init.normal_(self.batchnorm.weight, 1.0, 0.02)
         torch.nn.init.zeros_(self.batchnorm.bias)
-
+        
     def forward(self, x):
         
         # LoRA forward pass
@@ -122,7 +122,6 @@ class VariationalEncoder(torch.nn.Module):
     
 
 SMALL_NUM = np.log(1e-45)
-
 class DCL(object):
     """
     Decoupled Contrastive Loss proposed in https://arxiv.org/pdf/2110.06848.pdf
@@ -157,7 +156,6 @@ class DCL(object):
         
         return (positive_loss + negative_loss).mean()
 
-
 class DCLW(DCL):
     """
     Decoupled Contrastive Loss with negative von Mises-Fisher weighting proposed in https://arxiv.org/pdf/2110.06848.pdf
@@ -167,8 +165,7 @@ class DCLW(DCL):
     def __init__(self, sigma=0.5, temperature=0.1):
         weight_fn = lambda z1, z2: 2 - z1.size(0) * torch.nn.functional.softmax((z1 * z2).sum(dim=1) / sigma, dim=0).squeeze()
         super(DCLW, self).__init__(weight_fn=weight_fn, temperature=temperature)
-
-        
+  
 # merge two fully connected layers
 def merge_fc_layers(fc1, fc2):
     # Verify output dimensions match
