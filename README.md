@@ -43,7 +43,6 @@ Tutorial
 ------------
 We provide end-to-end Jupyter notebooks demonstrating how to use **multiVIB** across common integration tasks.
 
-### **Available Tutorials**
 - **[01_vertical_integration_test.ipynb](doc/tutorial/01_vertical_integration_test.ipynb)**  
   Apply multiVIB to the conceptual experiment we set up in Figure 2 of our manuscript.
 
