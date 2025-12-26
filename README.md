@@ -12,6 +12,8 @@ Existing tools typically focus on narrow integration scenarios, forcing research
 multiVIB addresses this limitation by providing a unified probabilistic contrastive learning framework that supports diverse single-cell integration tasks.
 ![multiVIB](https://github.com/broadinstitute/multiVIB/blob/main/doc/figure/Figure1_scenarios.png?raw=false)
 
+With the model backbone fixed, multiVIB adapts to different integration scenarios by altering only the training strategy, not the architecture. For horizontal integration, in which no jointly-profiled cells, datasets are anchored through shared features, and multiVIB aligns cells by enforcing consistency across shared genomic signals while ensuring that technical covariates do not drive the alignment. For vertical integration, jointly-profiled multi-omics data covers individual cells with multiple modality views. These cells serve as direct biological anchors, allowing multiVIB to learn cross-modality correspondence without relying on engineered feature mappings. Finally, mosaic integration is achieved by combining horizontal and vertical steps tailored to the pattern of modality overlap.
+
 
 Navigating this Repository
 --------------------------
