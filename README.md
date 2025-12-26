@@ -1,7 +1,7 @@
 multiVIB: A Unified Probabilistic Contrastive Learning Framework for Atlas-Scale Integration of Single-Cell Multi-Omics Data
 =======
 
-multiVIB is a unified framework to integrate single-cell multi-omics datasets across different scenarios.
+multiVIB is a unified framework to integrate single-cell multi-omics datasets across different scenarios. The model backbone of multiVIB consists of three parts: (1) a modality-specific linear translator, (2) a shared encoder, and (3) a shared projector.
 ![multiVIB](https://github.com/broadinstitute/multiVIB/blob/main/doc/figure/Figure1_framework.png?raw=false)
 
 Introduction
