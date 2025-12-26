@@ -5,9 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "multiVIB"
 authors = [{name = "Yang Xu"}]
-license = {text = "BSD (3-Clause)"}
+version = "0.1.0"
+license = { file = "LICENSE" }
 description = "A unified probabilistic contrastive learning framework for multi-omics integration"
 readme = "README.md"
+requires-python = ">=3.9"
 keywords = ["single cell", "multiomics", "deep learning"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -16,11 +18,11 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
-dynamic = ["version", "dependencies"]
 
-[tool.setuptools.dynamic]
-version = "0.1.0"
-dependencies = {file = ["requirements.txt"]}
+dependencies = [
+    "torch==2.3.0",
+    "scanpy",
+]
 
 [project.urls]
 Homepage = "http://github.com/broadinstitute/multiVIB"
