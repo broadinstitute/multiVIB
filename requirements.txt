@@ -1,2 +1,2 @@
 scanpy
-torch==2.3.0
+torch==2.8.0
