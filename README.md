@@ -141,7 +141,7 @@ multivib/
 | `multivib` | MaskedLinear (supports biological priors) | RNA ↔ ATAC with gene-peak links |
 | `multivibLoRA` | Low-rank adapter | High-dimensional modalities |
 
-### Multi-species / mosaic models
+### Multi-species
 
 | Model | Translator | Best for |
 |---|---|---|
