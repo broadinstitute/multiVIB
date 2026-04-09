@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**A Unified Probabilistic Contrastive Learning Framework for Atlas-Scale Integration of Single-Cell Multi-Omics Data**
+**A Unified Probabilistic Contrastive Learning Framework for Integration of Single-Cell Multi-Omics Data**
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-ee4c2c.svg)](https://pytorch.org/)
