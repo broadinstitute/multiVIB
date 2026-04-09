@@ -3,27 +3,52 @@ requires = ["setuptools>=61.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "multiVIB"
-authors = [{name = "Yang Xu"}]
+name = "multivib"
+authors = [
+    { name = "Yang Xu" },
+]
 version = "0.1.0"
 license = { file = "LICENSE" }
-description = "A unified probabilistic contrastive learning framework for multi-omics integration"
+description = "A unified probabilistic contrastive learning framework for atlas-scale integration of single-cell multi-omics data"
 readme = "README.md"
 requires-python = ">=3.9"
-keywords = ["single cell", "multiomics", "deep learning"]
+keywords = [
+    "single-cell",
+    "multi-omics",
+    "deep learning",
+    "contrastive learning",
+    "genomics",
+    "bioinformatics",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
 
 dependencies = [
-    "torch==2.3.0",
-    "scanpy",
+    "torch>=2.0.0",
+    "scanpy>=1.9",
+    "numpy>=1.23",
+    "scikit-learn>=1.1",
+    "tqdm>=4.64",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
 ]
 
 [project.urls]
-Homepage = "http://github.com/broadinstitute/multiVIB"
-Documentation = "http://github.com/broadinstitute/multiVIB"
+Homepage      = "https://github.com/broadinstitute/multiVIB"
+Documentation = "https://github.com/broadinstitute/multiVIB"
+"Bug Tracker" = "https://github.com/broadinstitute/multiVIB/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["multivib*"]
