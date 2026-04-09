@@ -352,11 +352,11 @@ def multivib_species_training(
         n_prototypes=64, latent_dim=64, sinkhorn_eps=0.05,
         ot_weight=1.0, cluster_momentum=0.99, use_pseudo_labels_for_ot=False,
     ).to(device)
-    graph_reg = GraphNeighborhoodReg(
-        k=15, weight_alignment=0.5, weight_contrastive=1.0,
-        weight_laplacian=0.5, weight_diffusion=0.5,
-        contrastive_margin=0.5, n_negative_samples=64,
-    ).to(device)
+    # graph_reg = GraphNeighborhoodReg(
+    #     k=15, weight_alignment=0.5, weight_contrastive=1.0,
+    #     weight_laplacian=0.5, weight_diffusion=0.0,
+    #     contrastive_margin=0.5, n_negative_samples=64,
+    # ).to(device)
     vicreg = VICRegLoss()
 
     # ------ cell-type encoding -----------------------------------------------
@@ -464,15 +464,15 @@ def multivib_species_training(
                     c_s = contrastive_loss(out1["proj"][s], out2["proj"][s])
                     kl_s = kl(out1["qz"][s], pz).sum(dim=1).mean()
                     ood_s, _ = ood_alignment(out1["proj"][s], out1["proj"][s - 1])
-                    g_s = graph_reg(out1["proj"][s], out1["proj"][s - 1])
+                    # g_s = graph_reg(out1["proj"][s], out1["proj"][s - 1])
                     v_s = 0.1 * vicreg(out1["proj"][s], out1["proj"][s - 1])
 
                     known_s = ct_batch[s] != unknown_class
                     if known_s.any():
                         clf_s = cls_criterion(out1["y"][s][known_s], ct_batch[s][known_s])
-                        loss += c_s + kl_s * alpha + ood_s * beta + clf_s + g_s + v_s
+                        loss += c_s + kl_s * alpha + ood_s * beta + clf_s + v_s # + g_s
                     else:
-                        loss += c_s + kl_s * alpha + ood_s * beta + g_s + v_s
+                        loss += c_s + kl_s * alpha + ood_s * beta + v_s # + g_s
 
                 loss.backward()
                 opt.step()
