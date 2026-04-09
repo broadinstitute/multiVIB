@@ -319,14 +319,14 @@ class multivibLoRAS(nn.Module):
         self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
+        self.apply(init_weights)
+      
         # Register as nn.ModuleList so parameters are tracked
         self.matrixA = nn.ModuleList(
             [nn.Linear(d, rank, bias=False) for d in n_input]
         )
         self.matrixB = nn.Linear(rank, n_shared_input, bias=True)
         self.batchnorm = nn.BatchNorm1d(n_shared_input)
-
-        self.apply(init_weights)
 
         # Re-initialise A and B explicitly (apply() may have overwritten them)
         for layer in self.matrixA:
