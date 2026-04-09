@@ -146,7 +146,7 @@ multivib/
 | Model | Translator | Best for |
 |---|---|---|
 | `multivibS` | Per-species MaskedLinear | Cross-species with shared orthologs |
-| `multivibLoRAS` | Shared B + per-species A | Very many species or cell atlases |
+| `multivibLoRAS` | Shared B + per-species A | Fine-tuning to recovery species-specific variations |
 | `multivibR` | — (single modality) | Reference atlas building from RNA only |
 
 ---
