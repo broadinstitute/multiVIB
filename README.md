@@ -103,7 +103,8 @@ with torch.no_grad():
         torch.tensor(batch_rna).float(),
         torch.tensor(batch_atac).float(),
     )
-latent = out["z_a"].numpy()   # shape (n_cells, n_latent)
+latent_a = out["z_a"].numpy()   # shape (n_cells, n_latent)
+latent_b = out["z_b"].numpy()   # shape (n_cells, n_latent)
 ```
 
 ---
