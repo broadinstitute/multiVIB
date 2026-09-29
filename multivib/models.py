@@ -9,16 +9,19 @@ multivibLoRA    Bi-modal backbone with LoRA translator.
 multivibS       Multi-species backbone with per-species MaskedLinear translators.
 multivibLoRAS   Multi-species backbone with shared low-rank translators.
 multivibR       Single-modality backbone with cell-type classification head.
+multivibJoint   Multi-species multi-modality backbone with explicit
+                (species, modality) translator routing via nn.ModuleDict.
 """
 
 import torch
 import torch.nn as nn
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .layers import (
     MaskedLinear,
     LoRALinear,
     VariationalEncoder,
+    FiLMProjector,
     CellTypeClassifier,
 )
 from .utils import init_weights
@@ -33,22 +36,23 @@ class multivib(nn.Module):
     Bi-modal multiVIB backbone.
 
     Architecture: ``modality-B → MaskedLinear translator → shared encoder
-    → shared projector``.
+    → shared FiLMProjector``.
 
     Supports both **vertical** (paired) and **horizontal** (unpaired)
     integration via the ``joint`` flag.
 
     Args:
-        n_input_a:  Input dimensionality of modality A.
-        n_input_b:  Input dimensionality of modality B.
-        n_hidden:   Hidden-layer width of the encoder.
-        n_latent:   Latent-space dimensionality.
-        n_batch:    Number of batch covariates for the projector.
-        mask:       Optional ``(n_input_a, n_input_b)`` prior mask for the
-                    translator.
-        joint:      If ``True`` the projector is bypassed (joint-cell mode).
-        relation:   ``"positive"`` or ``"negative"`` — sign of translator
-                    weight initialisation.
+        n_input_a:      Input dimensionality of modality A.
+        n_input_b:      Input dimensionality of modality B.
+        n_hidden:       Hidden-layer width of the encoder.
+        n_latent:       Latent-space dimensionality.
+        n_batch:        Number of batch covariates for the projector.
+        n_proj_hidden:  Intermediate width of the FiLM projector MLP.
+        mask:           Optional ``(n_input_a, n_input_b)`` prior mask for the
+                        translator.
+        joint:          If ``True`` the projector is bypassed (joint-cell mode).
+        relation:       ``"positive"`` or ``"negative"`` — sign of translator
+                        weight initialisation.
     """
 
     def __init__(
@@ -58,6 +62,7 @@ class multivib(nn.Module):
         n_hidden: int = 256,
         n_latent: int = 10,
         n_batch: int = 1,
+        n_proj_hidden: int = 256,
         mask: Optional[torch.Tensor] = None,
         joint: bool = True,
         relation: str = "positive",
@@ -78,9 +83,15 @@ class multivib(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent
         )
-        self.projecter = nn.Linear(self.n_latent + self.n_batch, 64)
+        self.projecter = FiLMProjector(
+            n_latent=self.n_latent, n_batch=self.n_batch,
+            n_proj_hidden=n_proj_hidden, n_out=64,
+        )
 
         self.apply(init_weights)
+        # FiLM layers start neutral (zero init) so batch conditioning is
+        # learned progressively rather than dominating from epoch 0.
+        self.projecter.reset_film_init()
 
         # Biologically-informed weight initialisation
         initial_weights = (
@@ -106,8 +117,8 @@ class multivib(nn.Module):
         if self.joint:
             p_a, p_b = z_a, z_b
         else:
-            p_a = self.projecter(torch.cat((z_a, batcha), dim=1))
-            p_b = self.projecter(torch.cat((z_b, batchb), dim=1))
+            p_a = self.projecter(z_a, batcha)
+            p_b = self.projecter(z_b, batchb)
 
         return {
             "z_a": z_a, "z_b": z_b,
@@ -130,13 +141,14 @@ class multivibLoRA(nn.Module):
     the translation matrix as a low-rank product ``W ≈ B · A``.
 
     Args:
-        n_input_a: Input dimensionality of modality A.
-        n_input_b: Input dimensionality of modality B.
-        n_hidden:  Hidden-layer width.
-        n_latent:  Latent-space dimensionality.
-        n_batch:   Number of batch covariates.
-        rank:      Inner rank of the LoRA translator.
-        joint:     If ``True`` the projector is bypassed.
+        n_input_a:     Input dimensionality of modality A.
+        n_input_b:     Input dimensionality of modality B.
+        n_hidden:      Hidden-layer width.
+        n_latent:      Latent-space dimensionality.
+        n_batch:       Number of batch covariates.
+        n_proj_hidden: Intermediate width of the FiLM projector MLP.
+        rank:          Inner rank of the LoRA translator.
+        joint:         If ``True`` the projector is bypassed.
     """
 
     def __init__(
@@ -146,6 +158,7 @@ class multivibLoRA(nn.Module):
         n_hidden: int = 256,
         n_latent: int = 10,
         n_batch: int = 1,
+        n_proj_hidden: int = 256,
         rank: int = 128,
         joint: bool = True,
     ) -> None:
@@ -161,8 +174,12 @@ class multivibLoRA(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent
         )
-        self.projecter = nn.Linear(self.n_latent + self.n_batch, 64)
+        self.projecter = FiLMProjector(
+            n_latent=self.n_latent, n_batch=self.n_batch,
+            n_proj_hidden=n_proj_hidden, n_out=64,
+        )
         self.apply(init_weights)
+        self.projecter.reset_film_init()
 
         # LoRA translator (initialised *after* apply so Kaiming isn't overwritten)
         self.translator = LoRALinear(self.n_input_b, self.n_input_a, self.rank)
@@ -181,8 +198,8 @@ class multivibLoRA(nn.Module):
         if self.joint:
             p_a, p_b = z_a, z_b
         else:
-            p_a = self.projecter(torch.cat((z_a, batcha), dim=1))
-            p_b = self.projecter(torch.cat((z_b, batchb), dim=1))
+            p_a = self.projecter(z_a, batcha)
+            p_b = self.projecter(z_b, batchb)
 
         return {
             "z_a": z_a, "z_b": z_b,
@@ -210,6 +227,7 @@ class multivibS(nn.Module):
         n_hidden:       Encoder hidden-layer width.
         n_latent:       Latent-space dimensionality.
         n_batch:        Number of batch covariates.
+        n_proj_hidden:  Intermediate width of the FiLM projector MLP.
         n_class:        Number of cell-type classes for the classifier.
     """
 
@@ -222,6 +240,7 @@ class multivibS(nn.Module):
         n_hidden: int = 256,
         n_latent: int = 10,
         n_batch: int = 1,
+        n_proj_hidden: int = 256,
         n_class: int = 1,
     ) -> None:
         super().__init__()
@@ -254,17 +273,21 @@ class multivibS(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
         )
-        self.projecter = nn.Linear(n_latent + n_batch, 64)
+        self.projecter = FiLMProjector(
+            n_latent=n_latent, n_batch=n_batch,
+            n_proj_hidden=n_proj_hidden, n_out=64,
+        )
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
         self.apply(init_weights)
+        self.projecter.reset_film_init()
 
     def forward(self, xs: List[torch.Tensor], batches: List[torch.Tensor]) -> dict:
         z, qz, proj, y = [], [], [], []
         for i, (x_i, b_i) in enumerate(zip(xs, batches)):
             xt = self.translators[i](x_i)
             qz_i, z_i = self.encoder(xt)
-            p_i = self.projecter(torch.cat((z_i, b_i), dim=1))
+            p_i = self.projecter(z_i, b_i)
             y_i = self.classifier(z_i)
             z.append(z_i)
             qz.append(qz_i)
@@ -291,6 +314,7 @@ class multivibLoRAS(nn.Module):
         n_hidden:       Encoder hidden-layer width.
         n_latent:       Latent-space dimensionality.
         n_batch:        Number of batch covariates.
+        n_proj_hidden:  Intermediate width of the FiLM projector MLP.
         n_class:        Number of cell-type classes.
         rank:           Inner rank of each A matrix.
     """
@@ -302,6 +326,7 @@ class multivibLoRAS(nn.Module):
         n_hidden: int = 256,
         n_latent: int = 10,
         n_batch: int = 1,
+        n_proj_hidden: int = 256,
         n_class: int = 1,
         rank: int = 128,
     ) -> None:
@@ -316,11 +341,15 @@ class multivibLoRAS(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
         )
-        self.projecter = nn.Linear(n_latent + n_batch, 64)
+        self.projecter = FiLMProjector(
+            n_latent=n_latent, n_batch=n_batch,
+            n_proj_hidden=n_proj_hidden, n_out=64,
+        )
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
         self.apply(init_weights)
-      
+        self.projecter.reset_film_init()
+
         # Register as nn.ModuleList so parameters are tracked
         self.matrixA = nn.ModuleList(
             [nn.Linear(d, rank, bias=False) for d in n_input]
@@ -340,7 +369,7 @@ class multivibLoRAS(nn.Module):
         for i, (x_i, b_i) in enumerate(zip(xs, batches)):
             xt = self.batchnorm(self.matrixB(self.matrixA[i](x_i)))
             qz_i, z_i = self.encoder(xt)
-            p_i = self.projecter(torch.cat((z_i, b_i), dim=1))
+            p_i = self.projecter(z_i, b_i)
             y_i = self.classifier(z_i)
             z.append(z_i)
             qz.append(qz_i)
@@ -361,11 +390,12 @@ class multivibR(nn.Module):
     scRNA-seq only).
 
     Args:
-        n_input_a: Input dimensionality.
-        n_hidden:  Encoder hidden-layer width.
-        n_latent:  Latent-space dimensionality.
-        n_batch:   Number of batch covariates.
-        n_class:   Number of cell-type classes.
+        n_input_a:     Input dimensionality.
+        n_hidden:      Encoder hidden-layer width.
+        n_latent:      Latent-space dimensionality.
+        n_batch:       Number of batch covariates.
+        n_proj_hidden: Intermediate width of the FiLM projector MLP.
+        n_class:       Number of cell-type classes.
     """
 
     def __init__(
@@ -374,6 +404,7 @@ class multivibR(nn.Module):
         n_hidden: int = 256,
         n_latent: int = 10,
         n_batch: int = 1,
+        n_proj_hidden: int = 256,
         n_class: int = 10,
     ) -> None:
         super().__init__()
@@ -386,13 +417,182 @@ class multivibR(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=n_input_a, n_hidden=n_hidden, n_latent=n_latent
         )
-        self.projecter = nn.Linear(n_latent + n_batch, 64)
+        self.projecter = FiLMProjector(
+            n_latent=n_latent, n_batch=n_batch,
+            n_proj_hidden=n_proj_hidden, n_out=64,
+        )
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
         self.apply(init_weights)
+        self.projecter.reset_film_init()
 
     def forward(self, x_a: torch.Tensor, batcha: torch.Tensor) -> dict:
         qz_a, z_a = self.encoder(x_a)
-        p_a = self.projecter(torch.cat((z_a, batcha), dim=1))
+        p_a = self.projecter(z_a, batcha)
         y_a = self.classifier(z_a)
         return {"z_a": z_a, "qz_a": qz_a, "proj_a": p_a, "y_a": y_a}
+
+
+# ---------------------------------------------------------------------------
+# Multi-species multi-modality model — explicit (species, modality) routing
+# ---------------------------------------------------------------------------
+
+class multivibJoint(nn.Module):
+    """
+    Multi-species multi-modality multiVIB backbone.
+
+    Each ``(species_id, modality_id)`` pair gets its **own** MaskedLinear
+    translator so that, e.g., species A / modality 1 never shares weights
+    with species A / modality 2 or with species B / modality 1.  Routing is
+    via ``nn.ModuleDict`` keyed by ``f"{species_id}_{modality_id}"``, which
+    makes the dispatch explicit and introspectable.
+
+    All translators feed into a **shared** variational encoder, FiLMProjector,
+    and cell-type classifier, enforcing a common latent geometry.
+
+    Args:
+        n_input:        ``dict`` mapping ``(species_id, modality_id)`` tuples
+                        to input feature dimensionalities, e.g.
+                        ``{(0, 0): 2000, (0, 1): 30000, (1, 0): 1800}``.
+        n_shared_input: Shared feature-space width (output of every translator).
+        masks:          Optional ``dict`` of the same keys as ``n_input``,
+                        mapping to prior mask tensors for ``MaskedLinear``.
+        relations:      Optional ``dict`` mapping keys to ``"positive"`` or
+                        ``"negative"`` (weight-sign initialisation).
+        n_hidden:       Encoder hidden-layer width.
+        n_latent:       Latent-space dimensionality.
+        n_batch:        Number of batch covariates for the FiLM projector.
+        n_proj_hidden:  Intermediate width of the projector MLP.
+        n_class:        Number of cell-type classes for the classifier.
+
+    Example::
+
+        model = multivibJoint(
+            n_input={(0, 0): 2000, (0, 1): 30000, (1, 0): 1800, (1, 1): 25000},
+            n_shared_input=1000,
+        )
+        # Forward: supply one tensor/batch per entity, plus their labels
+        out = model(
+            xs=[rna_A, atac_A, rna_B, atac_B],
+            batches=[b_rna_A, b_atac_A, b_rna_B, b_atac_B],
+            species_ids=[0, 0, 1, 1],
+            modality_ids=[0, 1, 0, 1],
+        )
+    """
+
+    def __init__(
+        self,
+        n_input: Dict[Tuple[int, int], int],
+        n_shared_input: int = 1000,
+        masks: Optional[Dict[Tuple[int, int], Optional[torch.Tensor]]] = None,
+        relations: Optional[Dict[Tuple[int, int], str]] = None,
+        n_hidden: int = 256,
+        n_latent: int = 10,
+        n_batch: int = 1,
+        n_proj_hidden: int = 256,
+        n_class: int = 1,
+    ) -> None:
+        super().__init__()
+
+        if masks is None:
+            masks = {}
+        if relations is None:
+            relations = {}
+
+        self.n_input = n_input
+        self.n_shared_input = n_shared_input
+        self.n_hidden = n_hidden
+        self.n_latent = n_latent
+        self.n_batch = n_batch
+
+        # Build one translator per (species_id, modality_id) pair.
+        # Stored in nn.ModuleDict so all parameters are tracked automatically.
+        translator_dict: Dict[str, nn.Module] = {}
+        for (sid, mid), n_feat in n_input.items():
+            key = self._key(sid, mid)
+            relation = relations.get((sid, mid), "positive")
+            ml = MaskedLinear(n_feat, n_shared_input)
+            init_w = (
+                torch.ones if relation == "positive"
+                else lambda *a: -torch.ones(*a)
+            )(n_shared_input, n_feat)
+            mask = masks.get((sid, mid))
+            if mask is not None:
+                ml.set_mask(mask)
+                init_w[mask != 1] = 0.0
+            ml.weight.data = init_w.to(ml.weight.device, ml.weight.dtype)
+            translator_dict[key] = nn.Sequential(ml, nn.BatchNorm1d(n_shared_input))
+        self.translators = nn.ModuleDict(translator_dict)
+
+        self.encoder = VariationalEncoder(
+            n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
+        )
+        self.projecter = FiLMProjector(
+            n_latent=n_latent, n_batch=n_batch,
+            n_proj_hidden=n_proj_hidden, n_out=64,
+        )
+        self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
+
+        self.apply(init_weights)
+        self.projecter.reset_film_init()
+
+    @staticmethod
+    def _key(species_id: int, modality_id: int) -> str:
+        """Convert (species_id, modality_id) pair to a ModuleDict key string."""
+        return f"{species_id}_{modality_id}"
+
+    def translate(
+        self, x: torch.Tensor, species_id: int, modality_id: int
+    ) -> torch.Tensor:
+        """
+        Translate raw features for the given ``(species_id, modality_id)``
+        entity into the shared feature space.
+
+        Args:
+            x:           Raw feature matrix, shape ``(N, n_input[(species_id, modality_id)])``.
+            species_id:  Integer species label.
+            modality_id: Integer modality label.
+
+        Returns:
+            Translated features, shape ``(N, n_shared_input)``.
+        """
+        key = self._key(species_id, modality_id)
+        if key not in self.translators:
+            raise KeyError(
+                f"No translator registered for (species_id={species_id}, "
+                f"modality_id={modality_id}).  Available keys: "
+                f"{list(self.translators.keys())}"
+            )
+        return self.translators[key](x)
+
+    def forward(
+        self,
+        xs: List[torch.Tensor],
+        batches: List[torch.Tensor],
+        species_ids: List[int],
+        modality_ids: List[int],
+    ) -> dict:
+        """
+        Forward pass routing each entity through its dedicated translator.
+
+        Args:
+            xs:          List of raw feature tensors, one per entity.
+            batches:     List of batch-covariate tensors, one per entity.
+            species_ids: Integer species label for each entity (parallel to xs).
+            modality_ids: Integer modality label for each entity (parallel to xs).
+
+        Returns:
+            dict with keys ``"z"``, ``"qz"``, ``"proj"``, ``"y"`` — each a
+            list with one entry per entity, in the same order as ``xs``.
+        """
+        z, qz, proj, y = [], [], [], []
+        for x_i, b_i, sid, mid in zip(xs, batches, species_ids, modality_ids):
+            xt = self.translate(x_i, sid, mid)   # explicit (species, modality) dispatch
+            qz_i, z_i = self.encoder(xt)
+            p_i = self.projecter(z_i, b_i)
+            y_i = self.classifier(z_i)
+            z.append(z_i)
+            qz.append(qz_i)
+            proj.append(p_i)
+            y.append(y_i)
+        return {"z": z, "qz": qz, "proj": proj, "y": y}
