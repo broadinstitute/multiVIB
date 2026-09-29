@@ -13,7 +13,7 @@ from .losses import (
     VICRegLoss,
 )
 from .models import multivib, multivibLoRA, multivibS, multivibLoRAS, multivibR
-from .checkpoint import save_checkpoint, load_checkpoint, setup_model_from_checkpoint
+from .checkpoint import save_checkpoint, load_checkpoint, setup_model_from_checkpoint, migrate_checkpoint
 from .preprocessing import normalize_log1p, preprocess_h5ad
 from .mapping import (
     match_features,
@@ -61,6 +61,7 @@ __all__ = [
     "save_checkpoint",
     "load_checkpoint",
     "setup_model_from_checkpoint",
+    "migrate_checkpoint",
     # preprocessing
     "normalize_log1p",
     "preprocess_h5ad",

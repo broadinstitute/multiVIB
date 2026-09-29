@@ -6,6 +6,9 @@ Functions
 save_checkpoint             Save model weights + constructor config (+ optimizer).
 load_checkpoint             Load a checkpoint file into an existing model.
 setup_model_from_checkpoint Rebuild a model from a checkpoint file alone.
+migrate_checkpoint          Partial-load an old-architecture checkpoint, recovering
+                            translator + classifier weights and re-initialising the
+                            encoder and projector.
 """
 
 import inspect
@@ -137,7 +140,7 @@ def setup_model_from_checkpoint(
         model, ckpt = setup_model_from_checkpoint("checkpoints/run1.pt")
         out = model(x_a, x_b, batcha, batchb)
     """
-    checkpoint = _torch_load(path, map_location)
+    checkpoint = _torch_load(path, map_location=map_location)
 
     class_name = checkpoint["model_class"]
     if class_name not in MODEL_REGISTRY:
@@ -153,3 +156,93 @@ def setup_model_from_checkpoint(
     if eval_mode:
         model.eval()
     return model, checkpoint
+
+
+def migrate_checkpoint(
+    path: Union[str, Path],
+    model: nn.Module,
+    map_location: Union[str, torch.device] = "cpu",
+    eval_mode: bool = True,
+    verbose: bool = True,
+) -> Dict[str, Any]:
+    """
+    Partially load an **old-architecture** checkpoint into a model built with
+    the current architecture.
+
+    This is needed when a checkpoint was saved before the encoder and projector
+    were redesigned (flat sequential encoder + ``nn.Linear`` projector → residual
+    encoder + ``FiLMProjector``).  The translator and classifier weights are
+    **shape-compatible** and are restored; the encoder and projector are left at
+    their fresh random initialisations, ready for fine-tuning.
+
+    Compatible weight groups recovered from the old checkpoint:
+
+    * ``translators.*``   — per-species / per-(species, modality) translator layers
+    * ``classifier.*``    — cell-type classifier head
+    * ``matrixA.*`` / ``matrixB.*`` / ``batchnorm.*`` — LoRA translator params
+      (for ``multivibLoRAS``-style checkpoints)
+
+    Args:
+        path:         Old checkpoint file written by :func:`save_checkpoint`.
+        model:        Model instance built with the **current** code.  Must be the
+                      same class and same constructor args (``n_input``,
+                      ``n_shared_input``, ``n_class``, etc.) as when the
+                      checkpoint was saved.
+        map_location: Device to map tensors to.
+        eval_mode:    If ``True`` (default) call ``model.eval()`` afterwards.
+        verbose:      Print a summary of what was recovered and what was skipped.
+
+    Returns:
+        The raw checkpoint dict (for inspection).
+
+    Example::
+
+        model = multivibS(n_input=[2000, 1800], n_shared_input=1000, n_latent=20)
+        ckpt  = migrate_checkpoint("reference_integration.pt", model)
+        # encoder + projector are fresh; translators + classifier are restored
+        # continue training or fine-tune from here
+    """
+    checkpoint = _torch_load(path, map_location=map_location)
+    old_sd = checkpoint["model_state_dict"]
+    new_sd = model.state_dict()
+
+    # Keys whose prefix is always architecture-compatible between old and new
+    _SAFE_PREFIXES = ("translators.", "classifier.", "matrixA.", "matrixB.", "batchnorm.")
+
+    recovered, skipped_shape, skipped_arch = [], [], []
+
+    for key, old_tensor in old_sd.items():
+        if not any(key.startswith(p) for p in _SAFE_PREFIXES):
+            skipped_arch.append(key)
+            continue
+        if key not in new_sd:
+            skipped_arch.append(key)
+            continue
+        if new_sd[key].shape != old_tensor.shape:
+            skipped_shape.append(
+                f"{key}: old {tuple(old_tensor.shape)} vs new {tuple(new_sd[key].shape)}"
+            )
+            continue
+        new_sd[key] = old_tensor.to(map_location)
+        recovered.append(key)
+
+    model.load_state_dict(new_sd, strict=False)
+    model.to(map_location)
+    if eval_mode:
+        model.eval()
+
+    if verbose:
+        print(f"migrate_checkpoint: recovered {len(recovered)} weight tensors")
+        if skipped_arch:
+            print(
+                f"  skipped {len(skipped_arch)} keys (architecture changed — "
+                "encoder + projector will use fresh initialisations):"
+            )
+            for k in skipped_arch:
+                print(f"    {k}")
+        if skipped_shape:
+            print(f"  skipped {len(skipped_shape)} keys (shape mismatch):")
+            for s in skipped_shape:
+                print(f"    {s}")
+
+    return checkpoint
