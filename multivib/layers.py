@@ -103,101 +103,61 @@ class LoRALinear(nn.Module):
 
 
 # ---------------------------------------------------------------------------
-# Encoder building blocks
-# ---------------------------------------------------------------------------
-
-class ResidualBlock(nn.Module):
-    """
-    Post-activation residual block for the variational encoder.
-
-    Applies ``Linear(in_dim, out_dim) → BN → SiLU → Dropout →
-    Linear(out_dim, out_dim) → BN``, then adds a skip connection and a
-    final ``SiLU``.  When ``in_dim != out_dim`` the skip is a bias-free
-    linear projection; otherwise it is an identity shortcut.
-
-    Args:
-        in_dim:  Input dimensionality.
-        out_dim: Output dimensionality.
-        dropout: Dropout probability inside the block.
-    """
-
-    def __init__(self, in_dim: int, out_dim: int, dropout: float = 0.1) -> None:
-        super().__init__()
-        self.block = nn.Sequential(
-            nn.Linear(in_dim, out_dim),
-            nn.BatchNorm1d(out_dim),
-            nn.SiLU(),
-            nn.Dropout(p=dropout),
-            nn.Linear(out_dim, out_dim),
-            nn.BatchNorm1d(out_dim),
-        )
-        self.skip = (
-            nn.Linear(in_dim, out_dim, bias=False)
-            if in_dim != out_dim
-            else nn.Identity()
-        )
-        self.act = nn.SiLU()
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.act(self.block(x) + self.skip(x))
-
-
-# ---------------------------------------------------------------------------
 # Encoder
 # ---------------------------------------------------------------------------
 
 class VariationalEncoder(nn.Module):
     """
-    Variational encoder with progressive narrowing and a residual block.
+    MLP variational encoder with a configurable number of hidden layers.
 
-    Architecture::
+    Maps input features to a diagonal-Gaussian posterior
+    ``q(z | x) = N(μ(x), σ²(x))``.
 
-        x → Linear(n_input, n_hidden) → Dropout(0.2) → BN → SiLU   [input proj]
-          → ResidualBlock(n_hidden, n_hidden // 2)                   [narrowing + residual]
-          → mean_encoder / var_encoder  →  Normal(μ, σ)
-
-    The three-stage progressive narrowing
-    (``n_input → n_hidden → n_hidden // 2 → n_latent``) softens the
-    dimensionality reduction compared to the previous two-layer flat design.
-    The residual skip connection stabilises gradient flow and ``SiLU``
-    replaces ``LeakyReLU`` throughout for smoother gradients.
+    Each hidden layer is a ``Linear → Dropout → BatchNorm1d → ReLU`` block.
+    The first block uses a higher dropout rate (0.2) than subsequent blocks
+    (0.1), matching the original two-layer design; ``n_layers=2`` reproduces
+    that architecture exactly.
 
     Args:
         n_input:  Dimensionality of the input features.
-        n_hidden: Width of the first hidden layer; the residual block maps
-                  to ``n_hidden // 2``.
+        n_hidden: Width of each hidden layer.
         n_latent: Dimensionality of the latent space.
+        n_layers: Number of stacked hidden blocks (``n_layers >= 1``).
         var_eps:  Small constant added to the variance for numerical stability.
-        dropout:  Dropout rate inside the residual block.
     """
 
     def __init__(
         self,
         n_input: int = 2000,
-        n_hidden: int = 256,
+        n_hidden: int = 128,
         n_latent: int = 10,
+        n_layers: int = 2,
         var_eps: float = 1e-4,
-        dropout: float = 0.1,
     ) -> None:
         super().__init__()
+        if n_layers < 1:
+            raise ValueError(f"n_layers must be >= 1, got {n_layers}")
+
         self.n_input = n_input
         self.n_latent = n_latent
+        self.n_layers = n_layers
         self.var_eps = var_eps
 
-        n_narrow = n_hidden // 2
+        blocks = []
+        in_dim = n_input
+        for i in range(n_layers):
+            dropout_p = 0.2 if i == 0 else 0.1
+            blocks += [
+                nn.Linear(in_dim, n_hidden),
+                nn.Dropout(p=dropout_p),
+                nn.BatchNorm1d(n_hidden),
+                nn.ReLU(), # nn.LeakyReLU(0.1), #
+            ]
+            in_dim = n_hidden
+        self.encoder = nn.Sequential(*blocks)
 
-        # Initial projection: high-dim input → first hidden width
-        self.input_proj = nn.Sequential(
-            nn.Linear(n_input, n_hidden),
-            nn.Dropout(p=0.2),
-            nn.BatchNorm1d(n_hidden),
-            nn.SiLU(),
-        )
-        # Residual block with progressive narrowing: n_hidden → n_narrow
-        self.res_block = ResidualBlock(n_hidden, n_narrow, dropout=dropout)
-
-        self.mean_encoder = nn.Linear(n_narrow, n_latent)
-        self.var_encoder = nn.Linear(n_narrow, n_latent)
+        self.mean_encoder = nn.Linear(n_hidden, n_latent)
+        self.var_encoder = nn.Linear(n_hidden, n_latent)
 
     def forward(self, x: torch.Tensor):
         """
@@ -205,14 +165,12 @@ class VariationalEncoder(nn.Module):
             dist:   Diagonal Normal posterior distribution.
             latent: Reparameterised sample from ``dist``.
         """
-        h = self.input_proj(x)
-        h = self.res_block(h)
-        qm = self.mean_encoder(h)
-        qv = torch.exp(self.var_encoder(h)) + self.var_eps
+        q = self.encoder(x)
+        qm = self.mean_encoder(q)
+        qv = torch.exp(self.var_encoder(q)) + self.var_eps
         dist = Normal(qm, qv.sqrt())
         latent = dist.rsample()
         return dist, latent
-
 
 # ---------------------------------------------------------------------------
 # GMM prior
