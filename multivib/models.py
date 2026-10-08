@@ -21,7 +21,6 @@ from .layers import (
     MaskedLinear,
     LoRALinear,
     VariationalEncoder,
-    FiLMProjector,
     CellTypeClassifier,
 )
 from .utils import init_weights
