@@ -35,7 +35,7 @@ class multivib(nn.Module):
     Bi-modal multiVIB backbone.
 
     Architecture: ``modality-B → MaskedLinear translator → shared encoder
-    → shared FiLMProjector``.
+    → shared projector``.
 
     Supports both **vertical** (paired) and **horizontal** (unpaired)
     integration via the ``joint`` flag.
@@ -45,6 +45,7 @@ class multivib(nn.Module):
         n_input_b:      Input dimensionality of modality B.
         n_hidden:       Hidden-layer width of the encoder.
         n_latent:       Latent-space dimensionality.
+        n_layers:       Number of hidden MLP blocks in the encoder (default 2).
         n_batch:        Number of batch covariates for the projector.
         n_proj_hidden:  Intermediate width of the FiLM projector MLP.
         mask:           Optional ``(n_input_a, n_input_b)`` prior mask for the
@@ -60,6 +61,7 @@ class multivib(nn.Module):
         n_input_b: int = 2000,
         n_hidden: int = 256,
         n_latent: int = 10,
+        n_layers: int = 2,
         n_batch: int = 1,
         n_proj_hidden: int = 256,
         mask: Optional[torch.Tensor] = None,
@@ -71,6 +73,7 @@ class multivib(nn.Module):
         self.n_input_b = n_input_b
         self.n_hidden = n_hidden
         self.n_latent = n_latent
+        self.n_layers = n_layers
         self.n_batch = n_batch
         self.joint = joint
 
@@ -80,10 +83,10 @@ class multivib(nn.Module):
         self.translator = nn.Sequential(masked_linear, nn.BatchNorm1d(self.n_input_a))
 
         self.encoder = VariationalEncoder(
-            n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent
+            n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent,
+            n_layers=self.n_layers,
         )
         self.projecter = nn.Linear(self.n_latent + self.n_batch, 64)
-
         self.apply(init_weights)
 
         # Biologically-informed weight initialisation
@@ -110,8 +113,8 @@ class multivib(nn.Module):
         if self.joint:
             p_a, p_b = z_a, z_b
         else:
-            p_a = self.projecter(z_a, batcha)
-            p_b = self.projecter(z_b, batchb)
+            p_a = self.projecter(torch.cat((z_a, batcha), dim=1))
+            p_b = self.projecter(torch.cat((z_b, batchb), dim=1))
 
         return {
             "z_a": z_a, "z_b": z_b,
@@ -138,6 +141,7 @@ class multivibLoRA(nn.Module):
         n_input_b:     Input dimensionality of modality B.
         n_hidden:      Hidden-layer width.
         n_latent:      Latent-space dimensionality.
+        n_layers:      Number of hidden MLP blocks in the encoder (default 2).
         n_batch:       Number of batch covariates.
         n_proj_hidden: Intermediate width of the FiLM projector MLP.
         rank:          Inner rank of the LoRA translator.
@@ -150,6 +154,7 @@ class multivibLoRA(nn.Module):
         n_input_b: int = 2000,
         n_hidden: int = 256,
         n_latent: int = 10,
+        n_layers: int = 2,
         n_batch: int = 1,
         n_proj_hidden: int = 256,
         rank: int = 128,
@@ -160,12 +165,14 @@ class multivibLoRA(nn.Module):
         self.n_input_b = n_input_b
         self.n_hidden = n_hidden
         self.n_latent = n_latent
+        self.n_layers = n_layers
         self.n_batch = n_batch
         self.rank = rank
         self.joint = joint
 
         self.encoder = VariationalEncoder(
-            n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent
+            n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent,
+            n_layers=self.n_layers,
         )
         self.projecter = nn.Linear(self.n_latent + self.n_batch, 64)
         self.apply(init_weights)
@@ -187,8 +194,8 @@ class multivibLoRA(nn.Module):
         if self.joint:
             p_a, p_b = z_a, z_b
         else:
-            p_a = self.projecter(z_a, batcha)
-            p_b = self.projecter(z_b, batchb)
+            p_a = self.projecter(torch.cat((z_a, batcha), dim=1))
+            p_b = self.projecter(torch.cat((z_b, batchb), dim=1))
 
         return {
             "z_a": z_a, "z_b": z_b,
@@ -215,6 +222,7 @@ class multivibS(nn.Module):
         relations:      List of ``"positive"`` / ``"negative"`` strings.
         n_hidden:       Encoder hidden-layer width.
         n_latent:       Latent-space dimensionality.
+        n_layers:       Number of hidden MLP blocks in the encoder (default 2).
         n_batch:        Number of batch covariates.
         n_proj_hidden:  Intermediate width of the FiLM projector MLP.
         n_class:        Number of cell-type classes for the classifier.
@@ -228,6 +236,7 @@ class multivibS(nn.Module):
         relations: Optional[List[str]] = None,
         n_hidden: int = 256,
         n_latent: int = 10,
+        n_layers: int = 2,
         n_batch: int = 1,
         n_proj_hidden: int = 256,
         n_class: int = 1,
@@ -243,6 +252,7 @@ class multivibS(nn.Module):
         self.n_shared_input = n_shared_input
         self.n_hidden = n_hidden
         self.n_latent = n_latent
+        self.n_layers = n_layers
         self.n_batch = n_batch
 
         # Register translators as nn.ModuleList so PyTorch tracks their params
@@ -260,7 +270,8 @@ class multivibS(nn.Module):
         self.translators = nn.ModuleList(translators)
 
         self.encoder = VariationalEncoder(
-            n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
+            n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent,
+            n_layers=n_layers,
         )
         self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
@@ -273,7 +284,7 @@ class multivibS(nn.Module):
         for i, (x_i, b_i) in enumerate(zip(xs, batches)):
             xt = self.translators[i](x_i)
             qz_i, z_i = self.encoder(xt)
-            p_i = self.projecter(z_i, b_i)
+            p_i = self.projecter(torch.cat((z_i, b_i), dim=1))
             y_i = self.classifier(z_i)
             z.append(z_i)
             qz.append(qz_i)
@@ -299,6 +310,7 @@ class multivibLoRAS(nn.Module):
         n_shared_input: Shared feature-space dimensionality (B output).
         n_hidden:       Encoder hidden-layer width.
         n_latent:       Latent-space dimensionality.
+        n_layers:       Number of hidden MLP blocks in the encoder (default 2).
         n_batch:        Number of batch covariates.
         n_proj_hidden:  Intermediate width of the FiLM projector MLP.
         n_class:        Number of cell-type classes.
@@ -311,6 +323,7 @@ class multivibLoRAS(nn.Module):
         n_shared_input: int = 1000,
         n_hidden: int = 256,
         n_latent: int = 10,
+        n_layers: int = 2,
         n_batch: int = 1,
         n_proj_hidden: int = 256,
         n_class: int = 1,
@@ -321,11 +334,13 @@ class multivibLoRAS(nn.Module):
         self.n_shared_input = n_shared_input
         self.n_hidden = n_hidden
         self.n_latent = n_latent
+        self.n_layers = n_layers
         self.n_batch = n_batch
         self.rank = rank
 
         self.encoder = VariationalEncoder(
-            n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
+            n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent,
+            n_layers=n_layers,
         )
         self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
@@ -352,7 +367,7 @@ class multivibLoRAS(nn.Module):
         for i, (x_i, b_i) in enumerate(zip(xs, batches)):
             xt = self.batchnorm(self.matrixB(self.matrixA[i](x_i)))
             qz_i, z_i = self.encoder(xt)
-            p_i = self.projecter(z_i, b_i)
+            p_i = self.projecter(torch.cat((z_i, b_i), dim=1))
             y_i = self.classifier(z_i)
             z.append(z_i)
             qz.append(qz_i)
@@ -376,6 +391,7 @@ class multivibR(nn.Module):
         n_input_a:     Input dimensionality.
         n_hidden:      Encoder hidden-layer width.
         n_latent:      Latent-space dimensionality.
+        n_layers:      Number of hidden MLP blocks in the encoder (default 2).
         n_batch:       Number of batch covariates.
         n_proj_hidden: Intermediate width of the FiLM projector MLP.
         n_class:       Number of cell-type classes.
@@ -386,6 +402,7 @@ class multivibR(nn.Module):
         n_input_a: int = 2000,
         n_hidden: int = 256,
         n_latent: int = 10,
+        n_layers: int = 2,
         n_batch: int = 1,
         n_proj_hidden: int = 256,
         n_class: int = 10,
@@ -394,11 +411,12 @@ class multivibR(nn.Module):
         self.n_input_a = n_input_a
         self.n_hidden = n_hidden
         self.n_latent = n_latent
+        self.n_layers = n_layers
         self.n_batch = n_batch
         self.n_class = n_class
 
         self.encoder = VariationalEncoder(
-            n_input=n_input_a, n_hidden=n_hidden, n_latent=n_latent
+            n_input=n_input_a, n_hidden=n_hidden, n_latent=n_latent, n_layers=n_layers,
         )
         self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
@@ -408,7 +426,7 @@ class multivibR(nn.Module):
 
     def forward(self, x_a: torch.Tensor, batcha: torch.Tensor) -> dict:
         qz_a, z_a = self.encoder(x_a)
-        p_a = self.projecter(z_a, batcha)
+        p_a = self.projecter(torch.cat((z_a, batcha), dim=1))
         y_a = self.classifier(z_a)
         return {"z_a": z_a, "qz_a": qz_a, "proj_a": p_a, "y_a": y_a}
 
@@ -441,6 +459,7 @@ class multivibJoint(nn.Module):
                         ``"negative"`` (weight-sign initialisation).
         n_hidden:       Encoder hidden-layer width.
         n_latent:       Latent-space dimensionality.
+        n_layers:       Number of hidden MLP blocks in the encoder (default 2).
         n_batch:        Number of batch covariates for the FiLM projector.
         n_proj_hidden:  Intermediate width of the projector MLP.
         n_class:        Number of cell-type classes for the classifier.
@@ -468,6 +487,7 @@ class multivibJoint(nn.Module):
         relations: Optional[Dict[Tuple[int, int], str]] = None,
         n_hidden: int = 256,
         n_latent: int = 10,
+        n_layers: int = 2,
         n_batch: int = 1,
         n_proj_hidden: int = 256,
         n_class: int = 1,
@@ -483,6 +503,7 @@ class multivibJoint(nn.Module):
         self.n_shared_input = n_shared_input
         self.n_hidden = n_hidden
         self.n_latent = n_latent
+        self.n_layers = n_layers
         self.n_batch = n_batch
 
         # Build one translator per (species_id, modality_id) pair.
@@ -505,16 +526,13 @@ class multivibJoint(nn.Module):
         self.translators = nn.ModuleDict(translator_dict)
 
         self.encoder = VariationalEncoder(
-            n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
+            n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent,
+            n_layers=n_layers,
         )
-        self.projecter = FiLMProjector(
-            n_latent=n_latent, n_batch=n_batch,
-            n_proj_hidden=n_proj_hidden, n_out=64,
-        )
+        self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
         self.apply(init_weights)
-        self.projecter.reset_film_init()
 
     @staticmethod
     def _key(species_id: int, modality_id: int) -> str:
@@ -569,7 +587,7 @@ class multivibJoint(nn.Module):
         for x_i, b_i, sid, mid in zip(xs, batches, species_ids, modality_ids):
             xt = self.translate(x_i, sid, mid)   # explicit (species, modality) dispatch
             qz_i, z_i = self.encoder(xt)
-            p_i = self.projecter(z_i, b_i)
+            p_i = self.projecter(torch.cat((z_i, b_i), dim=1))
             y_i = self.classifier(z_i)
             z.append(z_i)
             qz.append(qz_i)
