@@ -83,25 +83,19 @@ class multivib(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent
         )
-        self.projecter = FiLMProjector(
-            n_latent=self.n_latent, n_batch=self.n_batch,
-            n_proj_hidden=n_proj_hidden, n_out=64,
-        )
+        self.projecter = nn.Linear(self.n_latent + self.n_batch, 64)
 
         self.apply(init_weights)
-        # FiLM layers start neutral (zero init) so batch conditioning is
-        # learned progressively rather than dominating from epoch 0.
-        self.projecter.reset_film_init()
 
         # Biologically-informed weight initialisation
         initial_weights = (
             torch.ones if relation == "positive" else lambda *a: -torch.ones(*a)
         )(self.n_input_a, self.n_input_b)
+        init_translator_weights(self.translator[0], relation=relation)
         if mask is not None:
-            initial_weights[mask != 1] = 1e-6
-        self.translator[0].weight.data = initial_weights.to(
-            self.translator[0].weight.device, self.translator[0].weight.dtype
-        )
+            initial_weights[mask!=1]=1e-6
+            self.translator[0].weight.data = initial_weights.data.to(self.translator[0].weight.device, 
+                                                                     self.translator[0].weight.dtype)
 
     def forward(
         self,
@@ -174,12 +168,8 @@ class multivibLoRA(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=self.n_input_a, n_hidden=self.n_hidden, n_latent=self.n_latent
         )
-        self.projecter = FiLMProjector(
-            n_latent=self.n_latent, n_batch=self.n_batch,
-            n_proj_hidden=n_proj_hidden, n_out=64,
-        )
+        self.projecter = nn.Linear(self.n_latent + self.n_batch, 64)
         self.apply(init_weights)
-        self.projecter.reset_film_init()
 
         # LoRA translator (initialised *after* apply so Kaiming isn't overwritten)
         self.translator = LoRALinear(self.n_input_b, self.n_input_a, self.rank)
@@ -273,10 +263,7 @@ class multivibS(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
         )
-        self.projecter = FiLMProjector(
-            n_latent=n_latent, n_batch=n_batch,
-            n_proj_hidden=n_proj_hidden, n_out=64,
-        )
+        self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
         self.apply(init_weights)
@@ -341,10 +328,7 @@ class multivibLoRAS(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=n_shared_input, n_hidden=n_hidden, n_latent=n_latent
         )
-        self.projecter = FiLMProjector(
-            n_latent=n_latent, n_batch=n_batch,
-            n_proj_hidden=n_proj_hidden, n_out=64,
-        )
+        self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
         self.apply(init_weights)
@@ -417,10 +401,7 @@ class multivibR(nn.Module):
         self.encoder = VariationalEncoder(
             n_input=n_input_a, n_hidden=n_hidden, n_latent=n_latent
         )
-        self.projecter = FiLMProjector(
-            n_latent=n_latent, n_batch=n_batch,
-            n_proj_hidden=n_proj_hidden, n_out=64,
-        )
+        self.projecter = nn.Linear(n_latent + n_batch, 64)
         self.classifier = CellTypeClassifier(input_dim=n_latent, num_classes=n_class)
 
         self.apply(init_weights)
