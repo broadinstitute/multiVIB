@@ -22,6 +22,7 @@ from .layers import (
     LoRALinear,
     VariationalEncoder,
     CellTypeClassifier,
+    init_translator_weights
 )
 from .utils import init_weights
 
