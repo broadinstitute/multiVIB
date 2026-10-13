@@ -56,6 +56,64 @@ class MaskedLinear(nn.Linear):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return F.linear(x, self.get_masked_weight(), self.bias)
 
+def init_translator_weights(
+    layer: "MaskedLinear",
+    relation: str = "positive",
+    gain: float = 1.0,
+) -> None:
+    """
+    Sign-constrained, correctly-scaled init for a MaskedLinear translator.
+ 
+    Rather than filling with +/- 1.0 (which is ~45x larger than a Kaiming init
+    for a 2000-input layer, making real gradient steps numerically invisible),
+    this samples magnitudes at the Kaiming fan-in scale and then applies the
+    desired sign prior. Masked-out entries are left at exactly zero.
+ 
+    Args:
+        layer:     The MaskedLinear whose weight should be initialised.
+        relation:  "positive" or "negative" — the sign prior for active weights.
+        gain:      Multiplier on the fan-in scale, if you want a stronger prior.
+    """
+    if relation not in ("positive", "negative"):
+        raise ValueError(f"relation must be 'positive' or 'negative', got {relation!r}")
+ 
+    fan_in = layer.in_features
+    bound = gain / (fan_in ** 0.5)
+    sign = 1.0 if relation == "positive" else -1.0
+ 
+    with torch.no_grad():
+        # Magnitudes in (0, bound], then apply the sign prior.
+        magnitudes = torch.empty_like(layer.weight).uniform_(0.5 * bound, bound)
+        layer.weight.copy_(sign * magnitudes)
+        # Inactive connections contribute nothing; keep them at exact zero so
+        # the weight matrix is easy to inspect.
+        layer.weight.mul_(layer.mask != 0)
+        if layer.bias is not None:
+            layer.bias.zero_()
+
+def masked_weight_delta(layer: "MaskedLinear", reference: torch.Tensor) -> dict:
+    """
+    Diagnostic: how much have the *active* weights moved since `reference`?
+ 
+    Use this instead of comparing `weight.norm()`, which is misleading when a
+    BatchNorm follows the layer (BatchNorm makes the weight scale-invariant, so
+    the overall magnitude genuinely cannot learn — only the direction can).
+ 
+    Example:
+        ref = model.translator[0].weight.detach().clone()
+        ...  # train
+        print(masked_weight_delta(model.translator[0], ref))
+    """
+    with torch.no_grad():
+        active = layer.mask != 0
+        delta = (layer.weight - reference.to(layer.weight.device)).abs()
+        active_delta = delta[active]
+        return {
+            "max_abs_delta": delta.max().item(),
+            "mean_abs_delta_active": active_delta.mean().item() if active_delta.numel() else 0.0,
+            "frac_active_changed": (active_delta > 0).float().mean().item() if active_delta.numel() else 0.0,
+            "grad_is_none": layer.weight.grad is None,
+        }
 
 class LoRALinear(nn.Module):
     """
